@@ -19,6 +19,7 @@ import { MetricCard, SectionHeader, FilterButton, Currency, Percentage } from '.
 import type { AccentTone } from '../components/ui/Card';
 import PropertyFilter from '../components/ui/PropertyFilter';
 import HotelGroupsManager from '../components/ui/HotelGroupsManager';
+import BudgetDatasetSettings, { DEFAULT_BUDGET_DATASET_ID } from '../components/ui/BudgetDatasetSettings';
 import { HotelGroup } from '../types';
 import HotelsRequiringAttention from '../components/portfolio/HotelsRequiringAttention';
 import TopVarianceDrivers from '../components/portfolio/TopVarianceDrivers';
@@ -300,6 +301,35 @@ export const PortfolioOverview: React.FC = () => {
   });
   const [groupsManagerOpen, setGroupsManagerOpen] = useState(false);
 
+  const [budgetDatasetAssignments, setBudgetDatasetAssignments] = useState<Record<string, string>>(
+    () => {
+      const defaults: Record<string, string> = {};
+      for (const h of MOCK_HOTELS) defaults[h.id] = DEFAULT_BUDGET_DATASET_ID;
+      if (typeof window === 'undefined') return defaults;
+      try {
+        const raw = window.localStorage.getItem('labor-intel.budgetDatasetAssignments');
+        if (!raw) return defaults;
+        const parsed = JSON.parse(raw) as Record<string, string>;
+        return { ...defaults, ...parsed };
+      } catch {
+        return defaults;
+      }
+    }
+  );
+  const [budgetDatasetsOpen, setBudgetDatasetsOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(
+        'labor-intel.budgetDatasetAssignments',
+        JSON.stringify(budgetDatasetAssignments)
+      );
+    } catch {
+      /* ignore quota errors */
+    }
+  }, [budgetDatasetAssignments]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -521,6 +551,7 @@ export const PortfolioOverview: React.FC = () => {
               onChange={setSelectedHotelIds}
               groups={hotelGroups}
               onManageGroups={() => setGroupsManagerOpen(true)}
+              onManageBudgetDatasets={() => setBudgetDatasetsOpen(true)}
             />
           </div>
 
@@ -777,6 +808,14 @@ export const PortfolioOverview: React.FC = () => {
         groups={hotelGroups}
         onGroupsChange={setHotelGroups}
         onApplyGroup={(g) => setSelectedHotelIds(g.hotelIds)}
+      />
+
+      <BudgetDatasetSettings
+        open={budgetDatasetsOpen}
+        onClose={() => setBudgetDatasetsOpen(false)}
+        hotels={MOCK_HOTELS}
+        assignments={budgetDatasetAssignments}
+        onAssignmentsChange={setBudgetDatasetAssignments}
       />
     </div>
   );

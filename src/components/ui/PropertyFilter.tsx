@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Settings } from 'lucide-react';
+import { ChevronDown, Settings, Users, Database } from 'lucide-react';
 import { Hotel, HotelGroup } from '../../types';
 
 interface PropertyFilterProps {
@@ -8,6 +8,7 @@ interface PropertyFilterProps {
   onChange: (ids: string[]) => void;
   groups?: HotelGroup[];
   onManageGroups?: () => void;
+  onManageBudgetDatasets?: () => void;
 }
 
 const arraysEqualAsSets = (a: string[], b: string[]) => {
@@ -22,9 +23,12 @@ export const PropertyFilter: React.FC<PropertyFilterProps> = ({
   onChange,
   groups = [],
   onManageGroups,
+  onManageBudgetDatasets,
 }) => {
   const [open, setOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const settingsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -36,6 +40,17 @@ export const PropertyFilter: React.FC<PropertyFilterProps> = ({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        setSettingsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [settingsOpen]);
 
   const allSelected = selectedIds.length === hotels.length;
   const toggle = (id: string) => {
@@ -125,16 +140,61 @@ export const PropertyFilter: React.FC<PropertyFilterProps> = ({
           </div>
         )}
       </div>
-      {onManageGroups && (
-        <button
-          type="button"
-          onClick={onManageGroups}
-          className="p-1.5 text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 hover:text-slate-navy"
-          title="Manage property groups"
-          aria-label="Manage property groups"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
+      {(onManageGroups || onManageBudgetDatasets) && (
+        <div ref={settingsRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setSettingsOpen((o) => !o)}
+            className="p-1.5 text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 hover:text-slate-navy"
+            title="Settings"
+            aria-label="Settings"
+            aria-haspopup="menu"
+            aria-expanded={settingsOpen}
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+          {settingsOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 mt-1 w-64 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-1"
+            >
+              {onManageGroups && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setSettingsOpen(false);
+                    onManageGroups();
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-start gap-2"
+                >
+                  <Users className="w-4 h-4 text-gray-400 mt-0.5" />
+                  <div>
+                    <div className="font-medium text-slate-navy">Property Groups</div>
+                    <div className="text-xs text-gray-500">Create and manage saved property filters</div>
+                  </div>
+                </button>
+              )}
+              {onManageBudgetDatasets && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setSettingsOpen(false);
+                    onManageBudgetDatasets();
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-start gap-2"
+                >
+                  <Database className="w-4 h-4 text-gray-400 mt-0.5" />
+                  <div>
+                    <div className="font-medium text-slate-navy">Budget Datasets</div>
+                    <div className="text-xs text-gray-500">Choose which budget dataset each property uses</div>
+                  </div>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
