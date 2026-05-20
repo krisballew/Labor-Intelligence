@@ -14,12 +14,14 @@ import {
   Clock4,
   Gauge,
   FlaskConical,
+  Sparkles,
 } from 'lucide-react';
 import { MetricCard, SectionHeader, FilterButton, Currency, Percentage } from '../components/ui/Card';
 import type { AccentTone } from '../components/ui/Card';
 import PropertyFilter from '../components/ui/PropertyFilter';
 import HotelGroupsManager from '../components/ui/HotelGroupsManager';
 import BudgetDatasetSettings, { DEFAULT_BUDGET_DATASET_ID } from '../components/ui/BudgetDatasetSettings';
+import AIInsightsPanel from '../components/ui/AIInsightsPanel';
 import { HotelGroup } from '../types';
 import HotelsRequiringAttention from '../components/portfolio/HotelsRequiringAttention';
 import TopVarianceDrivers from '../components/portfolio/TopVarianceDrivers';
@@ -317,6 +319,7 @@ export const PortfolioOverview: React.FC = () => {
     }
   );
   const [budgetDatasetsOpen, setBudgetDatasetsOpen] = useState(false);
+  const [aiInsightsOpen, setAiInsightsOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -545,14 +548,25 @@ export const PortfolioOverview: React.FC = () => {
                 }
               />
             </div>
-            <PropertyFilter
-              hotels={MOCK_HOTELS}
-              selectedIds={selectedHotelIds}
-              onChange={setSelectedHotelIds}
-              groups={hotelGroups}
-              onManageGroups={() => setGroupsManagerOpen(true)}
-              onManageBudgetDatasets={() => setBudgetDatasetsOpen(true)}
-            />
+            <div className="flex items-center gap-2">
+              <PropertyFilter
+                hotels={MOCK_HOTELS}
+                selectedIds={selectedHotelIds}
+                onChange={setSelectedHotelIds}
+                groups={hotelGroups}
+                onManageGroups={() => setGroupsManagerOpen(true)}
+                onManageBudgetDatasets={() => setBudgetDatasetsOpen(true)}
+              />
+              <button
+                type="button"
+                onClick={() => setAiInsightsOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-teal-dark to-teal rounded-md hover:opacity-90 shadow-sm"
+                title="Open AI Insights"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>AI Insights</span>
+              </button>
+            </div>
           </div>
 
           {/* Module tabs */}
@@ -816,6 +830,44 @@ export const PortfolioOverview: React.FC = () => {
         hotels={MOCK_HOTELS}
         assignments={budgetDatasetAssignments}
         onAssignmentsChange={setBudgetDatasetAssignments}
+      />
+
+      <AIInsightsPanel
+        open={aiInsightsOpen}
+        onClose={() => setAiInsightsOpen(false)}
+        context={{
+          activeModule,
+          moduleLabel:
+            ({
+              overview: 'Portfolio Overview',
+              'budget-performance': 'Budget Performance',
+              'mid-month-forecast': 'Mid-Month Forecast',
+              'plan-standard-performance': 'Plan & Standard Performance',
+              'overtime-intelligence': 'Overtime Intelligence',
+              'scenario-lab': 'Scenario Lab',
+            } as Record<string, string>)[activeModule] ?? 'Dashboard',
+          periodLabel:
+            activeModule === 'overtime-intelligence'
+              ? 'Last 7 / Next 7 Days'
+              : activeModule === 'mid-month-forecast'
+              ? 'Current Month (MTD)'
+              : activeModule === 'scenario-lab'
+              ? 'Current Month Forward'
+              : period === 'previous-month'
+              ? 'Previous Month'
+              : period === 'current-month'
+              ? 'Current Month'
+              : 'Year to Date',
+          periodScale: view.additiveScale,
+          hotels: MOCK_HOTELS,
+          selectedHotels: MOCK_HOTELS.filter((h) => selectedIdSet.has(h.id)),
+          metrics: filteredMetrics,
+          riskCounts: {
+            onTrack: portfolioCounts.hotelsOnTrack,
+            caution: portfolioCounts.hotelsInCaution,
+            atRisk: portfolioCounts.hotelsAtRisk,
+          },
+        }}
       />
     </div>
   );
