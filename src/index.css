@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #f7f8fa;
+  color: #1f2937;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer components {
+  .metric-card {
+    @apply relative bg-white rounded-xl p-5 border border-gray-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-shadow;
+  }
+  .metric-card:hover {
+    @apply shadow-[0_4px_16px_rgba(15,23,42,0.06)];
+  }
+
+  .metric-label {
+    @apply text-[11px] font-semibold text-gray-500 uppercase tracking-[0.06em];
+  }
+
+  .metric-value {
+    @apply text-[28px] leading-tight font-semibold text-slate-navy mt-2 tabular-nums;
+  }
+
+  .metric-subtext {
+    @apply text-xs text-gray-500 mt-1;
+  }
+
+  .risk-badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold tracking-wide;
+  }
+
+  .risk-on-track {
+    @apply bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200;
+  }
+
+  .risk-caution {
+    @apply bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200;
+  }
+
+  .risk-at-risk {
+    @apply bg-red-50 text-red-700 ring-1 ring-inset ring-red-200;
+  }
+}
