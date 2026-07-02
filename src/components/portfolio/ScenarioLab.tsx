@@ -15,11 +15,15 @@ import {
   Wallet,
   CalendarClock,
   Award,
+  Layers,
 } from 'lucide-react';
 import { LaborMetrics } from '../../types';
+import ExportButton from '../ui/ExportButton';
+import CollapseToggle from '../ui/CollapseToggle';
 
 interface ScenarioLabProps {
   metrics: LaborMetrics[];
+  hotelNameById?: Map<string, string>;
 }
 
 type Tone = 'teal' | 'orange';
@@ -37,7 +41,6 @@ interface InputDef {
 
 interface Inputs {
   occupancy: number;        // absolute % (e.g., 92)
-  wageInflation: number;    // % (e.g., 3.5)
   productivity: number;     // % delta (e.g., +2.0 = 2% better)
   overtimeReduction: number; // % (negative = reduction, e.g., -15)
   agencyLabor: number;      // % of hours covered by agency
@@ -46,9 +49,129 @@ interface Inputs {
 
 const BASELINE_OCCUPANCY = 80; // baseline occupancy assumption
 
+// Division/Department/Job scope hierarchy for running scenarios at sub-portfolio levels.
+// `share` values are local to their parent (sum to ~1 within siblings); division `share`
+// is the share of total portfolio labor.
+interface ScopeJob { name: string; share: number; }
+interface ScopeDept { name: string; share: number; jobs: ScopeJob[]; }
+interface ScopeDiv { name: string; share: number; departments: ScopeDept[]; }
+
+const SCOPE_HIERARCHY: ScopeDiv[] = [
+  {
+    name: 'Rooms',
+    share: 0.55,
+    departments: [
+      {
+        name: 'Housekeeping',
+        share: 0.65,
+        jobs: [
+          { name: 'Room Attendant', share: 0.62 },
+          { name: 'Houseperson', share: 0.18 },
+          { name: 'Inspector', share: 0.12 },
+          { name: 'Laundry Attendant', share: 0.08 },
+        ],
+      },
+      {
+        name: 'Front Office',
+        share: 0.25,
+        jobs: [
+          { name: 'Front Desk Agent', share: 0.55 },
+          { name: 'Bell Attendant', share: 0.25 },
+          { name: 'Concierge', share: 0.20 },
+        ],
+      },
+      {
+        name: 'Night Audit',
+        share: 0.10,
+        jobs: [
+          { name: 'Night Auditor', share: 0.70 },
+          { name: 'Overnight Front Desk', share: 0.30 },
+        ],
+      },
+    ],
+  },
+  {
+    name: 'Food & Beverage',
+    share: 0.22,
+    departments: [
+      {
+        name: 'Restaurant',
+        share: 0.55,
+        jobs: [
+          { name: 'Server', share: 0.55 },
+          { name: 'Bartender', share: 0.25 },
+          { name: 'Host', share: 0.20 },
+        ],
+      },
+      {
+        name: 'Kitchen & Stewarding',
+        share: 0.45,
+        jobs: [
+          { name: 'Cook', share: 0.60 },
+          { name: 'Steward', share: 0.25 },
+          { name: 'Prep Cook', share: 0.15 },
+        ],
+      },
+    ],
+  },
+  {
+    name: 'Administrative & General',
+    share: 0.10,
+    departments: [
+      {
+        name: 'Administration',
+        share: 1,
+        jobs: [
+          { name: 'Accounting Clerk', share: 0.40 },
+          { name: 'HR Coordinator', share: 0.35 },
+          { name: 'Office Admin', share: 0.25 },
+        ],
+      },
+    ],
+  },
+  {
+    name: 'Sales & Marketing',
+    share: 0.04,
+    departments: [
+      {
+        name: 'Sales & Marketing',
+        share: 1,
+        jobs: [
+          { name: 'Sales Manager', share: 0.45 },
+          { name: 'Sales Coordinator', share: 0.35 },
+          { name: 'Marketing Coordinator', share: 0.20 },
+        ],
+      },
+    ],
+  },
+  {
+    name: 'Engineering',
+    share: 0.09,
+    departments: [
+      {
+        name: 'Engineering',
+        share: 1,
+        jobs: [
+          { name: 'Maintenance Engineer', share: 0.60 },
+          { name: 'Maintenance Tech', share: 0.30 },
+          { name: 'Grounds', share: 0.10 },
+        ],
+      },
+    ],
+  },
+];
+
+interface Scope {
+  property: string | null; // hotelId, null = all properties in current portfolio filter
+  division: string | null;
+  department: string | null;
+  job: string | null;
+}
+
+const PORTFOLIO_SCOPE: Scope = { property: null, division: null, department: null, job: null };
+
 const DEFAULTS: Inputs = {
   occupancy: 92,
-  wageInflation: 3.5,
   productivity: 2.0,
   overtimeReduction: -15,
   agencyLabor: 8,
@@ -67,23 +190,13 @@ const fmtCurrencyM = (n: number) => {
 const INPUT_DEFS: InputDef[] = [
   {
     key: 'occupancy',
-    label: 'Occupancy',
+    label: 'Key Business Indicator',
     icon: <Users className="w-5 h-5" />,
     min: 40,
     max: 100,
     step: 1,
     tone: 'teal',
     format: (v) => `${Math.round(v)}%`,
-  },
-  {
-    key: 'wageInflation',
-    label: 'Wage Inflation',
-    icon: <DollarSign className="w-5 h-5" />,
-    min: 0,
-    max: 15,
-    step: 0.1,
-    tone: 'teal',
-    format: (v) => `${v.toFixed(1)}%`,
   },
   {
     key: 'productivity',
@@ -421,41 +534,136 @@ const ProjectionChart: React.FC<ProjectionChartProps> = ({
   );
 };
 
-const ScenarioLab: React.FC<ScenarioLabProps> = ({ metrics }) => {
-  const [inputs, setInputs] = useState<Inputs>(DEFAULTS);
+interface ScopeOption {
+  value: string;
+  label: string;
+}
 
-  // Baseline from metrics (sum across selected properties)
+interface ScopeSelectProps {
+  label: string;
+  value: string;
+  placeholder: string;
+  options: Array<string | ScopeOption>;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}
+
+const ScopeSelect: React.FC<ScopeSelectProps> = ({
+  label,
+  value,
+  placeholder,
+  options,
+  disabled,
+  onChange,
+}) => {
+  const normalized: ScopeOption[] = options.map((o) =>
+    typeof o === 'string' ? { value: o, label: o } : o
+  );
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[11px] uppercase tracking-wider font-semibold text-gray-500">
+        {label}
+      </span>
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className="px-3 py-2 text-sm rounded-md border border-gray-300 bg-white text-slate-navy focus:outline-none focus:ring-2 focus:ring-teal-dark/30 disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
+      >
+        <option value="">{placeholder}</option>
+        {normalized.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+};
+
+const ScenarioLab: React.FC<ScenarioLabProps> = ({ metrics, hotelNameById }) => {
+  const [inputs, setInputs] = useState<Inputs>(DEFAULTS);
+  const [collapsed, setCollapsed] = useState(false);
+  const [scope, setScope] = useState<Scope>(PORTFOLIO_SCOPE);
+
+  // Properties available based on current portfolio filter
+  const propertyOptions = useMemo(
+    () =>
+      metrics
+        .map((m) => ({
+          id: m.hotelId,
+          name: hotelNameById?.get(m.hotelId) ?? m.hotelId,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [metrics, hotelNameById]
+  );
+
+  // Metrics narrowed by selected property (or all when none chosen)
+  const scopedMetrics = useMemo(
+    () => (scope.property ? metrics.filter((m) => m.hotelId === scope.property) : metrics),
+    [metrics, scope.property]
+  );
+
+  const scopeShare = useMemo(() => {
+    if (!scope.division) return 1;
+    const div = SCOPE_HIERARCHY.find((d) => d.name === scope.division);
+    if (!div) return 1;
+    if (!scope.department) return div.share;
+    const dept = div.departments.find((d) => d.name === scope.department);
+    if (!dept) return div.share;
+    if (!scope.job) return div.share * dept.share;
+    const job = dept.jobs.find((j) => j.name === scope.job);
+    if (!job) return div.share * dept.share;
+    return div.share * dept.share * job.share;
+  }, [scope]);
+
+  const scopeLabel = useMemo(() => {
+    const parts: string[] = [];
+    if (scope.property) {
+      parts.push(
+        propertyOptions.find((p) => p.id === scope.property)?.name ?? scope.property
+      );
+    }
+    if (scope.division) parts.push(scope.division);
+    if (scope.department) parts.push(scope.department);
+    if (scope.job) parts.push(scope.job);
+    if (parts.length === 0) return 'Entire Portfolio';
+    return parts.join(' → ');
+  }, [scope, propertyOptions]);
+
+  // Baseline from metrics (sum across selected properties, scaled to current scope)
   const baseline = useMemo(() => {
-    const actualHours = metrics.reduce((s, m) => s + m.actualHours, 0);
-    const actualCost = metrics.reduce((s, m) => s + m.actualCost, 0);
-    const budgetedHours = metrics.reduce((s, m) => s + m.budgetedHours, 0);
-    const budgetedCost = metrics.reduce((s, m) => s + m.budgetedCost, 0);
-    const forecastedHours = metrics.reduce((s, m) => s + m.forecastedHours, 0);
-    const forecastedCost = metrics.reduce((s, m) => s + m.forecastedCost, 0);
-    const scheduledHours = metrics.reduce((s, m) => s + m.scheduledHours, 0);
-    const standardHours = metrics.reduce((s, m) => s + m.standardHours, 0);
-    const otHours = metrics.reduce((s, m) => s + m.actualOvertimeHours, 0);
+    const actualHours = scopedMetrics.reduce((s, m) => s + m.actualHours, 0) * scopeShare;
+    const actualCost = scopedMetrics.reduce((s, m) => s + m.actualCost, 0) * scopeShare;
+    const budgetedHours = scopedMetrics.reduce((s, m) => s + m.budgetedHours, 0) * scopeShare;
+    const budgetedCost = scopedMetrics.reduce((s, m) => s + m.budgetedCost, 0) * scopeShare;
+    const forecastedHours = scopedMetrics.reduce((s, m) => s + m.forecastedHours, 0) * scopeShare;
+    const forecastedCost = scopedMetrics.reduce((s, m) => s + m.forecastedCost, 0) * scopeShare;
+    const scheduledHours = scopedMetrics.reduce((s, m) => s + m.scheduledHours, 0) * scopeShare;
+    const standardHours = scopedMetrics.reduce((s, m) => s + m.standardHours, 0) * scopeShare;
+    const otHours = scopedMetrics.reduce((s, m) => s + m.actualOvertimeHours, 0) * scopeShare;
     const blendedRate = actualHours > 0 ? actualCost / actualHours : 35;
     const otPct = actualHours > 0 ? (otHours / actualHours) * 100 : 0;
     const safe = (n: number, fallback: number) => (n > 0 ? n : fallback);
-    const ah = safe(actualHours, 134_500);
-    const ac = safe(actualCost, 6_490_000);
+    const fallbackScale = scopeShare;
+    const ah = safe(actualHours, 134_500 * fallbackScale);
+    const ac = safe(actualCost, 6_490_000 * fallbackScale);
     return {
       actualHours: ah,
       actualCost: ac,
-      budgetedHours: safe(budgetedHours, 132_000),
-      budgetedCost: safe(budgetedCost, 6_360_000),
-      forecastedHours: safe(forecastedHours, 133_500),
-      forecastedCost: safe(forecastedCost, 6_420_000),
-      scheduledHours: safe(scheduledHours, 131_800),
-      scheduledCost: safe(scheduledHours, 131_800) * (blendedRate || 35),
-      standardHours: safe(standardHours, 128_000),
-      standardCost: safe(standardHours, 128_000) * (blendedRate || 35),
-      otHours: safe(otHours, 7_800),
+      budgetedHours: safe(budgetedHours, 132_000 * fallbackScale),
+      budgetedCost: safe(budgetedCost, 6_360_000 * fallbackScale),
+      forecastedHours: safe(forecastedHours, 133_500 * fallbackScale),
+      forecastedCost: safe(forecastedCost, 6_420_000 * fallbackScale),
+      scheduledHours: safe(scheduledHours, 131_800 * fallbackScale),
+      scheduledCost: safe(scheduledHours, 131_800 * fallbackScale) * (blendedRate || 35),
+      standardHours: safe(standardHours, 128_000 * fallbackScale),
+      standardCost: safe(standardHours, 128_000 * fallbackScale) * (blendedRate || 35),
+      otHours: safe(otHours, 7_800 * fallbackScale),
       blendedRate: blendedRate || 35,
       otPct: otPct || 5.8,
     };
-  }, [metrics]);
+  }, [scopedMetrics, scopeShare]);
 
   // Projected results
   const projected = useMemo(() => {
@@ -463,7 +671,6 @@ const ScenarioLab: React.FC<ScenarioLabProps> = ({ metrics }) => {
     const demandFactor = 1 + inputs.groupDemand / 100;
     const prodFactor = 1 + inputs.productivity / 100; // higher productivity → fewer hours
     const otFactor = 1 + inputs.overtimeReduction / 100; // negative = reduction
-    const wageFactor = 1 + inputs.wageInflation / 100;
     const agencyPremium = 0.30; // agency labor 30% more expensive per hour
     const agencyShare = inputs.agencyLabor / 100;
     const agencyCostFactor = 1 + agencyShare * agencyPremium;
@@ -472,11 +679,11 @@ const ScenarioLab: React.FC<ScenarioLabProps> = ({ metrics }) => {
     const projOtHours = baseline.otHours * otFactor * occFactor;
     const projOtPct = projHours > 0 ? (projOtHours / projHours) * 100 : 0;
 
-    // Cost: hours * rate * wage * agencyPremium, OT reduction also lowers OT-rate cost
+    // Cost: hours * rate * agencyPremium, OT reduction also lowers OT-rate cost
     const otSavingsHours = baseline.otHours - projOtHours; // positive if reduced
     const otSavings = otSavingsHours * baseline.blendedRate * 0.5; // OT premium ~0.5x
     const projCost =
-      projHours * baseline.blendedRate * wageFactor * agencyCostFactor - otSavings;
+      projHours * baseline.blendedRate * agencyCostFactor - otSavings;
 
     const hoursDeltaPct = ((projHours - baseline.actualHours) / baseline.actualHours) * 100;
     const costDeltaPct = ((projCost - baseline.actualCost) / baseline.actualCost) * 100;
@@ -605,17 +812,104 @@ const ScenarioLab: React.FC<ScenarioLabProps> = ({ metrics }) => {
           <h2 className="text-2xl font-bold text-slate-navy">Scenario Lab</h2>
           <p className="text-sm text-gray-500 mt-1">
             Model labor outcomes by adjusting demand, productivity, and cost levers. Projected
-            results update live across budget, forecast, schedule, and standards baselines.
+            results update live across budget, forecast, schedule, and standards baselines for{' '}
+            <span className="font-semibold text-slate-navy">{scopeLabel}</span>.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={reset}
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-teal-dark/5 text-teal-dark text-xs font-semibold hover:bg-teal-dark/10"
-        >
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            type="button"
+            onClick={reset}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-teal-dark/5 text-teal-dark text-xs font-semibold hover:bg-teal-dark/10"
+          >
           <RotateCcw className="w-4 h-4" />
           Reset to baseline
         </button>
+          <ExportButton sectionLabel="Scenario Lab" />
+          <CollapseToggle
+            collapsed={collapsed}
+            onToggle={() => setCollapsed((v) => !v)}
+            sectionLabel="Scenario Lab"
+          />
+        </div>
+      </div>
+
+      {!collapsed && (
+        <>
+      {/* Scenario Scope */}
+      <div className="metric-card">
+        <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="text-teal-dark">
+              <Layers className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-slate-navy">Scenario Scope</div>
+              <div className="text-xs text-gray-500">
+                Run the scenario against the entire portfolio or drill into a specific property,
+                division, department, or job.
+              </div>
+            </div>
+          </div>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-teal-dark/5 text-teal-dark text-xs font-semibold">
+            <span className="uppercase tracking-wider text-[10px] text-teal-dark/70">Active</span>
+            <span>{scopeLabel}</span>
+            <span className="text-teal-dark/50">
+              · {(scopeShare * 100).toFixed(scopeShare < 0.1 ? 1 : 0)}% of {scope.property ? 'property' : 'portfolio'}
+            </span>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          <ScopeSelect
+            label="Property"
+            value={scope.property ?? ''}
+            placeholder="All properties"
+            options={propertyOptions.map((p) => ({ value: p.id, label: p.name }))}
+            onChange={(v) =>
+              setScope((prev) => ({ ...prev, property: v || null }))
+            }
+          />
+          <ScopeSelect
+            label="Division"
+            value={scope.division ?? ''}
+            placeholder="All divisions"
+            options={SCOPE_HIERARCHY.map((d) => d.name)}
+            onChange={(v) =>
+              setScope((prev) => ({
+                ...prev,
+                division: v || null,
+                department: null,
+                job: null,
+              }))
+            }
+          />
+          <ScopeSelect
+            label="Department"
+            value={scope.department ?? ''}
+            placeholder={scope.division ? 'All departments' : 'Select a division first'}
+            disabled={!scope.division}
+            options={
+              SCOPE_HIERARCHY.find((d) => d.name === scope.division)?.departments.map(
+                (d) => d.name
+              ) ?? []
+            }
+            onChange={(v) =>
+              setScope((prev) => ({ ...prev, department: v || null, job: null }))
+            }
+          />
+          <ScopeSelect
+            label="Job"
+            value={scope.job ?? ''}
+            placeholder={scope.department ? 'All jobs' : 'Select a department first'}
+            disabled={!scope.department}
+            options={
+              SCOPE_HIERARCHY.find((d) => d.name === scope.division)
+                ?.departments.find((d) => d.name === scope.department)
+                ?.jobs.map((j) => j.name) ?? []
+            }
+            onChange={(v) => setScope((prev) => ({ ...prev, job: v || null }))}
+          />
+        </div>
       </div>
 
       {/* Scenario Inputs */}
@@ -649,79 +943,6 @@ const ScenarioLab: React.FC<ScenarioLabProps> = ({ metrics }) => {
             );
           })}
         </div>
-      </div>
-
-      {/* Projection Over Time */}
-      <div className="flex items-center gap-3 pt-2">
-        <div className="text-teal-dark">
-          <TrendingUp className="w-5 h-5" />
-        </div>
-        <div>
-          <h3 className="text-lg font-semibold text-slate-navy">Projection Over Time</h3>
-          <p className="text-xs text-gray-500">
-            Actuals through today, with the scenario projection extending against budget and forecast.
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <ProjectionChart
-          title="Labor Hours"
-          subtitle="Monthly run-rate"
-          icon={<Clock4 className="w-5 h-5" />}
-          iconColor="#0D5463"
-          budget={series.budgetHours}
-          forecast={series.forecastHours}
-          actual={series.actualHoursSeries}
-          scenario={series.scenarioHoursForward}
-          format={fmtHours}
-        />
-        <ProjectionChart
-          title="Labor Cost"
-          subtitle="Monthly run-rate"
-          icon={<DollarSign className="w-5 h-5" />}
-          iconColor="#E85D1F"
-          budget={series.budgetCost}
-          forecast={series.forecastCost}
-          actual={series.actualCostSeries}
-          scenario={series.scenarioCostForward}
-          format={fmtCurrencyM}
-        />
-      </div>
-
-      {/* Projected Results header */}
-      <div className="flex items-center gap-3">
-        <div className="text-blue-600">
-          <BarChart3 className="w-5 h-5" />
-        </div>
-        <div>
-          <h3 className="text-lg font-semibold text-slate-navy">Projected Results</h3>
-          <p className="text-xs text-gray-500">
-            Scenario projection compared against each operational baseline.
-          </p>
-        </div>
-      </div>
-
-      {/* Hours + Cost impact matrices */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <ImpactTable
-          title="Hours Impact"
-          subtitle={`Projected labor hours: ${fmtHours(projected.projHours)}`}
-          icon={<Clock4 className="w-5 h-5" />}
-          iconColor="#0D5463"
-          rows={hoursRows}
-          format={fmtHours}
-          metricLabel="Hours"
-        />
-        <ImpactTable
-          title="Cost Impact"
-          subtitle={`Projected labor cost: ${fmtCurrencyM(projected.projCost)}`}
-          icon={<DollarSign className="w-5 h-5" />}
-          iconColor="#E85D1F"
-          rows={costRows}
-          format={fmtCurrencyM}
-          metricLabel="Cost"
-        />
       </div>
 
       {/* Impact Risks header */}
@@ -799,6 +1020,81 @@ const ScenarioLab: React.FC<ScenarioLabProps> = ({ metrics }) => {
           subtextColor="text-gray-500"
         />
       </div>
+
+      {/* Projection Over Time */}
+      <div className="flex items-center gap-3 pt-2">
+        <div className="text-teal-dark">
+          <TrendingUp className="w-5 h-5" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-slate-navy">Projection Over Time</h3>
+          <p className="text-xs text-gray-500">
+            Actuals through today, with the scenario projection extending against budget and forecast.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ProjectionChart
+          title="Labor Hours"
+          subtitle="Monthly run-rate"
+          icon={<Clock4 className="w-5 h-5" />}
+          iconColor="#0D5463"
+          budget={series.budgetHours}
+          forecast={series.forecastHours}
+          actual={series.actualHoursSeries}
+          scenario={series.scenarioHoursForward}
+          format={fmtHours}
+        />
+        <ProjectionChart
+          title="Labor Cost"
+          subtitle="Monthly run-rate"
+          icon={<DollarSign className="w-5 h-5" />}
+          iconColor="#E85D1F"
+          budget={series.budgetCost}
+          forecast={series.forecastCost}
+          actual={series.actualCostSeries}
+          scenario={series.scenarioCostForward}
+          format={fmtCurrencyM}
+        />
+      </div>
+
+      {/* Projected Results header */}
+      <div className="flex items-center gap-3">
+        <div className="text-blue-600">
+          <BarChart3 className="w-5 h-5" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-slate-navy">Projected Results</h3>
+          <p className="text-xs text-gray-500">
+            Scenario projection compared against each operational baseline.
+          </p>
+        </div>
+      </div>
+
+      {/* Hours + Cost impact matrices */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ImpactTable
+          title="Hours Impact"
+          subtitle={`Projected labor hours: ${fmtHours(projected.projHours)}`}
+          icon={<Clock4 className="w-5 h-5" />}
+          iconColor="#0D5463"
+          rows={hoursRows}
+          format={fmtHours}
+          metricLabel="Hours"
+        />
+        <ImpactTable
+          title="Cost Impact"
+          subtitle={`Projected labor cost: ${fmtCurrencyM(projected.projCost)}`}
+          icon={<DollarSign className="w-5 h-5" />}
+          iconColor="#E85D1F"
+          rows={costRows}
+          format={fmtCurrencyM}
+          metricLabel="Cost"
+        />
+      </div>
+        </>
+      )}
     </div>
   );
 };

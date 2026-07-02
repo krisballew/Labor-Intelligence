@@ -1,6 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Hotel, LaborMetrics } from '../../types';
+import ExportButton from '../ui/ExportButton';
+import CollapseToggle from '../ui/CollapseToggle';
+import { HotelLink } from '../ui/HotelSelectionContext';
 
 interface ActualVsTargetsGridProps {
   hotels: Hotel[];
@@ -259,6 +262,7 @@ export const ActualVsTargetsGrid: React.FC<ActualVsTargetsGridProps> = ({
 }) => {
   const [enabledComparisons, setEnabledComparisons] = useState<ComparisonKey[]>(['budget']);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState(false);
 
   const toggleExpanded = (id: string) => {
     setExpandedIds((curr) => {
@@ -309,14 +313,27 @@ export const ActualVsTargetsGrid: React.FC<ActualVsTargetsGridProps> = ({
   }, [rows]);
 
   return (
-    <section className="bg-white border border-gray-200 rounded-xl shadow-sm">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h2 className="text-xl font-bold text-slate-navy">Actual vs Targets</h2>
-        <p className="text-xs text-gray-500 mt-1">
-          Compare actual hours and cost against any combination of targets. Expand a property to drill into divisions and departments.
-          <span className="text-gray-400"> · {periodLabel}</span>
-        </p>
+    <section className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-slate-navy tracking-tight leading-tight">Actual vs Targets</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Compare actual hours and cost against any combination of targets. Expand a property to drill into divisions and departments.
+            <span className="text-gray-400"> · {periodLabel}</span>
+          </p>
+        </div>
+        <div className="flex-shrink-0 flex items-center gap-2">
+          <ExportButton sectionLabel="Actual vs Targets" />
+          <CollapseToggle
+            collapsed={collapsed}
+            onToggle={() => setCollapsed((v) => !v)}
+            sectionLabel="Actual vs Targets"
+          />
+        </div>
       </div>
+
+      {!collapsed && (
+        <>
 
       <div className="px-6 py-3 border-b border-gray-100 flex flex-wrap items-center gap-2">
         <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 mr-1">
@@ -350,14 +367,14 @@ export const ActualVsTargetsGrid: React.FC<ActualVsTargetsGridProps> = ({
             <tr className="bg-gray-50/70 border-b border-gray-200">
               <th
                 rowSpan={2}
-                className="text-left py-3 px-4 font-semibold text-gray-700 text-xs uppercase tracking-wider align-bottom border-r border-gray-200"
+                className="text-left py-3 px-3 font-semibold text-gray-700 text-xs uppercase tracking-wider align-bottom border-r border-gray-200"
               >
                 <span className="inline-block w-4" />
                 Property
               </th>
               <th
                 colSpan={2}
-                className="text-center py-2 px-3 font-semibold text-gray-700 text-xs uppercase tracking-wider border-r border-gray-200"
+                className="text-center py-2 px-2 font-semibold text-gray-700 text-xs uppercase tracking-wider border-r border-gray-200"
               >
                 Actual
               </th>
@@ -365,31 +382,31 @@ export const ActualVsTargetsGrid: React.FC<ActualVsTargetsGridProps> = ({
                 <th
                   key={c.key}
                   colSpan={4}
-                  className="text-center py-2 px-3 font-semibold text-xs uppercase tracking-wider border-r border-gray-200 last:border-r-0"
+                  className="text-center py-2 px-2 font-semibold text-xs uppercase tracking-wider border-r border-gray-200 last:border-r-0"
                 >
                   <span className={`inline-block px-2 py-0.5 rounded ${c.accent}`}>{c.label}</span>
                 </th>
               ))}
             </tr>
             <tr className="bg-gray-50/70 border-b border-gray-200">
-              <th className="text-right py-2 px-3 font-medium text-gray-600 text-[11px] uppercase tracking-wider">
+              <th className="text-right py-2 px-2 font-medium text-gray-600 text-[11px] uppercase tracking-wider whitespace-nowrap">
                 Hours
               </th>
-              <th className="text-right py-2 px-3 font-medium text-gray-600 text-[11px] uppercase tracking-wider border-r border-gray-200">
+              <th className="text-right py-2 px-2 font-medium text-gray-600 text-[11px] uppercase tracking-wider border-r border-gray-200 whitespace-nowrap">
                 Cost
               </th>
               {orderedComparisons.map((c) => (
                 <React.Fragment key={c.key}>
-                  <th className="text-right py-2 px-3 font-medium text-gray-600 text-[11px] uppercase tracking-wider">
+                  <th className="text-right py-2 px-2 font-medium text-gray-600 text-[11px] uppercase tracking-wider whitespace-nowrap">
                     Hours
                   </th>
-                  <th className="text-right py-2 px-3 font-medium text-gray-600 text-[11px] uppercase tracking-wider">
+                  <th className="text-right py-2 px-2 font-medium text-gray-600 text-[11px] uppercase tracking-wider whitespace-nowrap">
                     Hrs Var
                   </th>
-                  <th className="text-right py-2 px-3 font-medium text-gray-600 text-[11px] uppercase tracking-wider">
+                  <th className="text-right py-2 px-2 font-medium text-gray-600 text-[11px] uppercase tracking-wider whitespace-nowrap">
                     Cost
                   </th>
-                  <th className="text-right py-2 px-3 font-medium text-gray-600 text-[11px] uppercase tracking-wider border-r border-gray-200 last:border-r-0">
+                  <th className="text-right py-2 px-2 font-medium text-gray-600 text-[11px] uppercase tracking-wider border-r border-gray-200 last:border-r-0 whitespace-nowrap">
                     Cost Var
                   </th>
                 </React.Fragment>
@@ -413,29 +430,31 @@ export const ActualVsTargetsGrid: React.FC<ActualVsTargetsGridProps> = ({
               return (
                 <React.Fragment key={r.hotel.id}>
                   <tr className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4 border-r border-gray-100">
-                      <button
-                        type="button"
-                        onClick={() => toggleExpanded(r.hotel.id)}
-                        className="flex items-start gap-2 text-left w-full focus:outline-none focus:ring-2 focus:ring-teal rounded"
-                        aria-expanded={isExpanded}
-                        aria-label={isExpanded ? `Collapse ${r.hotel.name}` : `Expand ${r.hotel.name}`}
-                      >
-                        <span className="mt-0.5 text-gray-500">
+                    <td className="py-3 px-3 border-r border-gray-100">
+                      <div className="flex items-start gap-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleExpanded(r.hotel.id)}
+                          className="mt-0.5 text-gray-500 hover:text-slate-navy focus:outline-none focus:ring-2 focus:ring-teal rounded"
+                          aria-expanded={isExpanded}
+                          aria-label={isExpanded ? `Collapse ${r.hotel.name}` : `Expand ${r.hotel.name}`}
+                        >
                           {isExpanded ? (
                             <ChevronDown className="w-4 h-4" />
                           ) : (
                             <ChevronRight className="w-4 h-4" />
                           )}
-                        </span>
+                        </button>
                         <span>
-                          <span className="block font-medium text-slate-navy">{r.hotel.name}</span>
+                          <HotelLink hotelId={r.hotel.id} className="block font-medium text-slate-navy">
+                            {r.hotel.name}
+                          </HotelLink>
                           <span className="block text-xs text-gray-500">{r.hotel.region}</span>
                         </span>
-                      </button>
+                      </div>
                     </td>
-                    <td className="py-3 px-3 text-right text-gray-900">{fmtHours(r.actualHours)}</td>
-                    <td className="py-3 px-3 text-right text-gray-900 border-r border-gray-100">
+                    <td className="py-3 px-2 text-right tabular-nums text-gray-900 whitespace-nowrap">{fmtHours(r.actualHours)}</td>
+                    <td className="py-3 px-2 text-right tabular-nums text-gray-900 border-r border-gray-100 whitespace-nowrap">
                       {fmtCurrency(r.actualCost)}
                     </td>
                     {orderedComparisons.map((c) => {
@@ -444,12 +463,12 @@ export const ActualVsTargetsGrid: React.FC<ActualVsTargetsGridProps> = ({
                       const costVar = r.actualCost - target.cost;
                       return (
                         <React.Fragment key={c.key}>
-                          <td className="py-3 px-3 text-right text-gray-700">{fmtHours(target.hours)}</td>
-                          <td className={`py-3 px-3 text-right ${varianceClass(hoursVar)}`}>
+                          <td className="py-3 px-2 text-right tabular-nums text-gray-700 whitespace-nowrap">{fmtHours(target.hours)}</td>
+                          <td className={`py-3 px-2 text-right tabular-nums whitespace-nowrap ${varianceClass(hoursVar)}`}>
                             {fmtSignedHours(hoursVar)}
                           </td>
-                          <td className="py-3 px-3 text-right text-gray-700">{fmtCurrency(target.cost)}</td>
-                          <td className={`py-3 px-3 text-right border-r border-gray-100 last:border-r-0 ${varianceClass(costVar)}`}>
+                          <td className="py-3 px-2 text-right tabular-nums text-gray-700 whitespace-nowrap">{fmtCurrency(target.cost)}</td>
+                          <td className={`py-3 px-2 text-right tabular-nums border-r border-gray-100 last:border-r-0 whitespace-nowrap ${varianceClass(costVar)}`}>
                             {fmtSignedCurrency(costVar)}
                           </td>
                         </React.Fragment>
@@ -458,13 +477,13 @@ export const ActualVsTargetsGrid: React.FC<ActualVsTargetsGridProps> = ({
                   </tr>
                   {isExpanded && breakdown && breakdown.flatMap((div) => [
                     <tr key={`${r.hotel.id}-div-${div.name}`} className="bg-gray-50/60 border-b border-gray-100">
-                      <td className="py-2 px-4 pl-10 border-r border-gray-100">
+                      <td className="py-2 px-3 pl-10 border-r border-gray-100">
                         <span className="text-xs font-semibold uppercase tracking-wider text-slate-navy">
                           {div.name}
                         </span>
                       </td>
-                      <td className="py-2 px-3 text-right text-gray-800 text-xs">{fmtHours(div.actualHours)}</td>
-                      <td className="py-2 px-3 text-right text-gray-800 text-xs border-r border-gray-100">
+                      <td className="py-2 px-2 text-right tabular-nums text-gray-800 text-xs whitespace-nowrap">{fmtHours(div.actualHours)}</td>
+                      <td className="py-2 px-2 text-right tabular-nums text-gray-800 text-xs border-r border-gray-100 whitespace-nowrap">
                         {fmtCurrency(div.actualCost)}
                       </td>
                       {orderedComparisons.map((c) => {
@@ -473,12 +492,12 @@ export const ActualVsTargetsGrid: React.FC<ActualVsTargetsGridProps> = ({
                         const costVar = div.actualCost - target.cost;
                         return (
                           <React.Fragment key={c.key}>
-                            <td className="py-2 px-3 text-right text-gray-700 text-xs">{fmtHours(target.hours)}</td>
-                            <td className={`py-2 px-3 text-right text-xs ${varianceClass(hoursVar)}`}>
+                            <td className="py-2 px-2 text-right tabular-nums text-gray-700 text-xs whitespace-nowrap">{fmtHours(target.hours)}</td>
+                            <td className={`py-2 px-2 text-right tabular-nums text-xs whitespace-nowrap ${varianceClass(hoursVar)}`}>
                               {fmtSignedHours(hoursVar)}
                             </td>
-                            <td className="py-2 px-3 text-right text-gray-700 text-xs">{fmtCurrency(target.cost)}</td>
-                            <td className={`py-2 px-3 text-right text-xs border-r border-gray-100 last:border-r-0 ${varianceClass(costVar)}`}>
+                            <td className="py-2 px-2 text-right tabular-nums text-gray-700 text-xs whitespace-nowrap">{fmtCurrency(target.cost)}</td>
+                            <td className={`py-2 px-2 text-right tabular-nums text-xs border-r border-gray-100 last:border-r-0 whitespace-nowrap ${varianceClass(costVar)}`}>
                               {fmtSignedCurrency(costVar)}
                             </td>
                           </React.Fragment>
@@ -487,11 +506,11 @@ export const ActualVsTargetsGrid: React.FC<ActualVsTargetsGridProps> = ({
                     </tr>,
                     ...div.departments.map((dept) => (
                       <tr key={`${r.hotel.id}-dept-${div.name}-${dept.name}`} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-2 px-4 pl-16 border-r border-gray-100">
+                        <td className="py-2 px-3 pl-16 border-r border-gray-100">
                           <span className="text-xs text-gray-700">{dept.name}</span>
                         </td>
-                        <td className="py-2 px-3 text-right text-gray-700 text-xs">{fmtHours(dept.actualHours)}</td>
-                        <td className="py-2 px-3 text-right text-gray-700 text-xs border-r border-gray-100">
+                        <td className="py-2 px-2 text-right tabular-nums text-gray-700 text-xs whitespace-nowrap">{fmtHours(dept.actualHours)}</td>
+                        <td className="py-2 px-2 text-right tabular-nums text-gray-700 text-xs border-r border-gray-100 whitespace-nowrap">
                           {fmtCurrency(dept.actualCost)}
                         </td>
                         {orderedComparisons.map((c) => {
@@ -500,12 +519,12 @@ export const ActualVsTargetsGrid: React.FC<ActualVsTargetsGridProps> = ({
                           const costVar = dept.actualCost - target.cost;
                           return (
                             <React.Fragment key={c.key}>
-                              <td className="py-2 px-3 text-right text-gray-600 text-xs">{fmtHours(target.hours)}</td>
-                              <td className={`py-2 px-3 text-right text-xs ${varianceClass(hoursVar)}`}>
+                              <td className="py-2 px-2 text-right tabular-nums text-gray-600 text-xs whitespace-nowrap">{fmtHours(target.hours)}</td>
+                              <td className={`py-2 px-2 text-right tabular-nums text-xs whitespace-nowrap ${varianceClass(hoursVar)}`}>
                                 {fmtSignedHours(hoursVar)}
                               </td>
-                              <td className="py-2 px-3 text-right text-gray-600 text-xs">{fmtCurrency(target.cost)}</td>
-                              <td className={`py-2 px-3 text-right text-xs border-r border-gray-100 last:border-r-0 ${varianceClass(costVar)}`}>
+                              <td className="py-2 px-2 text-right tabular-nums text-gray-600 text-xs whitespace-nowrap">{fmtCurrency(target.cost)}</td>
+                              <td className={`py-2 px-2 text-right tabular-nums text-xs border-r border-gray-100 last:border-r-0 whitespace-nowrap ${varianceClass(costVar)}`}>
                                 {fmtSignedCurrency(costVar)}
                               </td>
                             </React.Fragment>
@@ -521,12 +540,12 @@ export const ActualVsTargetsGrid: React.FC<ActualVsTargetsGridProps> = ({
           {rows.length > 0 && (
             <tfoot>
               <tr className="bg-gray-50 border-t-2 border-gray-300 font-semibold">
-                <td className="py-3 px-4 border-r border-gray-200 text-slate-navy">
+                <td className="py-3 px-3 border-r border-gray-200 text-slate-navy">
                   Totals
                   <div className="text-xs font-normal text-gray-500">{rows.length} properties</div>
                 </td>
-                <td className="py-3 px-3 text-right text-slate-navy">{fmtHours(totals.actualHours)}</td>
-                <td className="py-3 px-3 text-right text-slate-navy border-r border-gray-200">
+                <td className="py-3 px-2 text-right tabular-nums text-slate-navy whitespace-nowrap">{fmtHours(totals.actualHours)}</td>
+                <td className="py-3 px-2 text-right tabular-nums text-slate-navy border-r border-gray-200 whitespace-nowrap">
                   {fmtCurrency(totals.actualCost)}
                 </td>
                 {orderedComparisons.map((c) => {
@@ -535,12 +554,12 @@ export const ActualVsTargetsGrid: React.FC<ActualVsTargetsGridProps> = ({
                   const costVar = totals.actualCost - t.cost;
                   return (
                     <React.Fragment key={c.key}>
-                      <td className="py-3 px-3 text-right text-slate-navy">{fmtHours(t.hours)}</td>
-                      <td className={`py-3 px-3 text-right ${varianceClass(hoursVar)}`}>
+                      <td className="py-3 px-2 text-right tabular-nums text-slate-navy whitespace-nowrap">{fmtHours(t.hours)}</td>
+                      <td className={`py-3 px-2 text-right tabular-nums whitespace-nowrap ${varianceClass(hoursVar)}`}>
                         {fmtSignedHours(hoursVar)}
                       </td>
-                      <td className="py-3 px-3 text-right text-slate-navy">{fmtCurrency(t.cost)}</td>
-                      <td className={`py-3 px-3 text-right border-r border-gray-200 last:border-r-0 ${varianceClass(costVar)}`}>
+                      <td className="py-3 px-2 text-right tabular-nums text-slate-navy whitespace-nowrap">{fmtCurrency(t.cost)}</td>
+                      <td className={`py-3 px-2 text-right tabular-nums border-r border-gray-200 last:border-r-0 whitespace-nowrap ${varianceClass(costVar)}`}>
                         {fmtSignedCurrency(costVar)}
                       </td>
                     </React.Fragment>
@@ -552,9 +571,8 @@ export const ActualVsTargetsGrid: React.FC<ActualVsTargetsGridProps> = ({
         </table>
       </div>
 
-      <div className="px-6 py-3 text-xs text-gray-500 border-t border-gray-100">
-        Positive variance = actual above target (unfavorable). Schedule and Standards cost is derived from each property's average labor rate.
-      </div>
+        </>
+      )}
     </section>
   );
 };

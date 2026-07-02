@@ -13,6 +13,9 @@ import {
   X,
 } from 'lucide-react';
 import { LaborMetrics } from '../../types';
+import ExportButton from '../ui/ExportButton';
+import CollapseToggle from '../ui/CollapseToggle';
+import { HotelLink } from '../ui/HotelSelectionContext';
 
 interface OvertimeIntelligenceProps {
   metrics: LaborMetrics[];
@@ -242,7 +245,7 @@ const KpiCard: React.FC<KpiProps> = ({
                 return (
                   <li key={c.hotelId} className="text-sm">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-gray-800 truncate">{c.hotelName}</span>
+                      <HotelLink hotelId={c.hotelId} className="text-gray-800 truncate">{c.hotelName}</HotelLink>
                       <span className="font-medium text-slate-navy tabular-nums flex-shrink-0">
                         {c.display}
                       </span>
@@ -466,7 +469,9 @@ const OTBreakdownModal: React.FC<OTBreakdownModalProps> = ({
                           ) : (
                             <ChevronRight className="w-4 h-4 text-gray-400" />
                           )}
-                          <span className="font-semibold text-slate-navy">{p.hotelName}</span>
+                          <HotelLink hotelId={p.hotelId} className="font-semibold text-slate-navy" stopPropagation>
+                            {p.hotelName}
+                          </HotelLink>
                         </div>
                       </td>
                       <td className="py-2.5 text-right font-semibold text-slate-navy tabular-nums">
@@ -572,6 +577,7 @@ const OTBreakdownModal: React.FC<OTBreakdownModalProps> = ({
 
 export const OvertimeIntelligence: React.FC<OvertimeIntelligenceProps> = ({ metrics, hotelNameById }) => {
   const [detailsView, setDetailsView] = useState<'actual' | 'scheduled' | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   const perProperty = useMemo(() => {
     return metrics.map((m) => {
@@ -681,12 +687,22 @@ export const OvertimeIntelligence: React.FC<OvertimeIntelligenceProps> = ({ metr
             Look-back on incurred overtime and look-ahead on scheduled exposure for the portfolio.
           </p>
         </div>
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-teal-dark/5 text-teal-dark text-xs font-semibold">
-          <CalendarRange className="w-4 h-4" />
-          Last 7 / Next 7 Days
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-teal-dark/5 text-teal-dark text-xs font-semibold">
+            <CalendarRange className="w-4 h-4" />
+            Last 7 / Next 7 Days
+          </div>
+          <ExportButton sectionLabel="Overtime Intelligence" />
+          <CollapseToggle
+            collapsed={collapsed}
+            onToggle={() => setCollapsed((v) => !v)}
+            sectionLabel="Overtime Intelligence"
+          />
         </div>
       </div>
 
+      {!collapsed && (
+        <>
       {/* KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <KpiCard
@@ -813,6 +829,8 @@ export const OvertimeIntelligence: React.FC<OvertimeIntelligenceProps> = ({ metr
           }))}
           onClose={() => setDetailsView(null)}
         />
+      )}
+        </>
       )}
     </div>
   );

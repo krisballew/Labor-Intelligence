@@ -14,6 +14,9 @@ import {
   X,
 } from 'lucide-react';
 import { LaborMetrics } from '../../types';
+import ExportButton from '../ui/ExportButton';
+import CollapseToggle from '../ui/CollapseToggle';
+import { HotelLink } from '../ui/HotelSelectionContext';
 
 interface PlanStandardPerformanceProps {
   metrics: LaborMetrics[];
@@ -137,7 +140,7 @@ const KpiCard: React.FC<KpiCardProps> = ({
                 return (
                   <li key={c.hotelId} className="text-sm">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-gray-800 truncate">{c.hotelName}</span>
+                      <HotelLink hotelId={c.hotelId} className="text-gray-800 truncate">{c.hotelName}</HotelLink>
                       <div className="text-right flex-shrink-0">
                         <div className="font-medium text-slate-navy tabular-nums">
                           {c.display}
@@ -592,7 +595,9 @@ const AdherenceBreakdownModal: React.FC<AdherenceBreakdownModalProps> = ({
                           ) : (
                             <ChevronRight className="w-4 h-4 text-gray-400" />
                           )}
-                          <span className="font-semibold text-slate-navy">{p.hotelName}</span>
+                          <HotelLink hotelId={p.hotelId} className="font-semibold text-slate-navy" stopPropagation>
+                            {p.hotelName}
+                          </HotelLink>
                         </div>
                       </td>
                       <td className="py-2.5 text-right font-semibold text-slate-navy tabular-nums">
@@ -728,6 +733,7 @@ export const PlanStandardPerformance: React.FC<PlanStandardPerformanceProps> = (
   periodScale = 1,
 }) => {
   const [detailsView, setDetailsView] = useState<'schedule' | 'standard' | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   // Static splits for derived buckets (unscheduled vs over-clocked split of positive variance)
   const UNSCHEDULED_SHARE = 0.66;
@@ -829,13 +835,21 @@ export const PlanStandardPerformance: React.FC<PlanStandardPerformanceProps> = (
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-end gap-4">
+      <div className="flex items-start justify-end gap-2">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-teal-dark/5 text-teal-dark text-xs font-semibold">
           <CalendarRange className="w-4 h-4" />
           {periodLabel}
         </div>
+        <ExportButton sectionLabel="Plan & Standard Performance" />
+        <CollapseToggle
+          collapsed={collapsed}
+          onToggle={() => setCollapsed((v) => !v)}
+          sectionLabel="Plan & Standard Performance"
+        />
       </div>
 
+      {!collapsed && (
+        <>
       {/* Section: Actual vs Schedule */}
       <div className="flex items-center gap-2">
         <CalendarClock className="w-5 h-5 text-teal-dark" />
@@ -1022,6 +1036,8 @@ export const PlanStandardPerformance: React.FC<PlanStandardPerformanceProps> = (
           }))}
           onClose={() => setDetailsView(null)}
         />
+      )}
+        </>
       )}
     </div>
   );

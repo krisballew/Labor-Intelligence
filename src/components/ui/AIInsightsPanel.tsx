@@ -31,6 +31,8 @@ interface ChatMessage {
 interface DerivedSummary {
   totalActualHours: number;
   totalBudgetHours: number;
+  totalScheduledHours: number;
+  totalForecastHours: number;
   totalActualCost: number;
   totalBudgetCost: number;
   totalForecastCost: number;
@@ -39,6 +41,10 @@ interface DerivedSummary {
   totalOtCost: number;
   hoursVariance: number;
   hoursVariancePct: number;
+  scheduledHoursVariance: number;
+  scheduledHoursVariancePct: number;
+  forecastHoursVariance: number;
+  forecastHoursVariancePct: number;
   costVariance: number;
   costVariancePct: number;
   stdVariance: number;
@@ -49,12 +55,16 @@ interface DerivedSummary {
   topUnderBudget: HotelDerived | null;
   topOt: HotelDerived | null;
   topStdMiss: HotelDerived | null;
+  topScheduleGap: HotelDerived | null;
+  topForecastGap: HotelDerived | null;
 }
 
 interface HotelDerived {
   hotel: Hotel;
   actualHours: number;
   budgetHours: number;
+  scheduledHours: number;
+  forecastHours: number;
   actualCost: number;
   budgetCost: number;
   forecastCost: number;
@@ -64,7 +74,23 @@ interface HotelDerived {
   costVariance: number;
   costVariancePct: number;
   hoursVariance: number;
+  scheduledVariance: number;
+  scheduledVariancePct: number;
+  forecastVariance: number;
+  forecastVariancePct: number;
   stdVariance: number;
+}
+
+function getScopeLabels(ctx: AIInsightsContext) {
+  const singleProperty = ctx.selectedHotels.length === 1;
+  const propertyName = ctx.selectedHotels[0]?.name ?? 'selected property';
+  return {
+    singleProperty,
+    subjectLabel: singleProperty ? propertyName : 'portfolio',
+    subjectNoun: singleProperty ? 'property' : 'properties',
+    subjectSingular: singleProperty ? 'property' : 'property',
+    selectedLabel: singleProperty ? 'this property' : 'this portfolio',
+  };
 }
 
 function buildSummary(ctx: AIInsightsContext): DerivedSummary {
@@ -75,6 +101,8 @@ function buildSummary(ctx: AIInsightsContext): DerivedSummary {
     if (!hotel) continue;
     const actualHours = m.actualHours * s;
     const budgetHours = m.budgetedHours * s;
+    const scheduledHours = m.scheduledHours * s;
+    const forecastHours = m.forecastedHours * s;
     const actualCost = m.actualCost * s;
     const budgetCost = m.budgetedCost * s;
     const forecastCost = m.forecastedCost * s;
@@ -86,6 +114,8 @@ function buildSummary(ctx: AIInsightsContext): DerivedSummary {
       hotel,
       actualHours,
       budgetHours,
+      scheduledHours,
+      forecastHours,
       actualCost,
       budgetCost,
       forecastCost,
@@ -95,6 +125,10 @@ function buildSummary(ctx: AIInsightsContext): DerivedSummary {
       costVariance: actualCost - budgetCost,
       costVariancePct: budgetCost > 0 ? ((actualCost - budgetCost) / budgetCost) * 100 : 0,
       hoursVariance: actualHours - budgetHours,
+      scheduledVariance: actualHours - scheduledHours,
+      scheduledVariancePct: scheduledHours > 0 ? ((actualHours - scheduledHours) / scheduledHours) * 100 : 0,
+      forecastVariance: actualHours - forecastHours,
+      forecastVariancePct: forecastHours > 0 ? ((actualHours - forecastHours) / forecastHours) * 100 : 0,
       stdVariance: actualHours - standardHours,
     });
   }
@@ -102,6 +136,8 @@ function buildSummary(ctx: AIInsightsContext): DerivedSummary {
   const sum = (sel: (h: HotelDerived) => number) => perHotel.reduce((acc, h) => acc + sel(h), 0);
   const totalActualHours = sum((h) => h.actualHours);
   const totalBudgetHours = sum((h) => h.budgetHours);
+  const totalScheduledHours = sum((h) => h.scheduledHours);
+  const totalForecastHours = sum((h) => h.forecastHours);
   const totalActualCost = sum((h) => h.actualCost);
   const totalBudgetCost = sum((h) => h.budgetCost);
   const totalForecastCost = sum((h) => h.forecastCost);
@@ -110,6 +146,8 @@ function buildSummary(ctx: AIInsightsContext): DerivedSummary {
   const totalOtCost = sum((h) => h.otCost);
 
   const hoursVariance = totalActualHours - totalBudgetHours;
+  const scheduledHoursVariance = totalActualHours - totalScheduledHours;
+  const forecastHoursVariance = totalActualHours - totalForecastHours;
   const costVariance = totalActualCost - totalBudgetCost;
   const stdVariance = totalActualHours - totalStandardHours;
 
@@ -117,10 +155,14 @@ function buildSummary(ctx: AIInsightsContext): DerivedSummary {
   const topUnderBudget = [...perHotel].sort((a, b) => a.costVariance - b.costVariance)[0] ?? null;
   const topOt = [...perHotel].sort((a, b) => b.otCost - a.otCost)[0] ?? null;
   const topStdMiss = [...perHotel].sort((a, b) => b.stdVariance - a.stdVariance)[0] ?? null;
+  const topScheduleGap = [...perHotel].sort((a, b) => Math.abs(b.scheduledVariance) - Math.abs(a.scheduledVariance))[0] ?? null;
+  const topForecastGap = [...perHotel].sort((a, b) => Math.abs(b.forecastVariance) - Math.abs(a.forecastVariance))[0] ?? null;
 
   return {
     totalActualHours,
     totalBudgetHours,
+    totalScheduledHours,
+    totalForecastHours,
     totalActualCost,
     totalBudgetCost,
     totalForecastCost,
@@ -129,6 +171,10 @@ function buildSummary(ctx: AIInsightsContext): DerivedSummary {
     totalOtCost,
     hoursVariance,
     hoursVariancePct: totalBudgetHours > 0 ? (hoursVariance / totalBudgetHours) * 100 : 0,
+    scheduledHoursVariance,
+    scheduledHoursVariancePct: totalScheduledHours > 0 ? (scheduledHoursVariance / totalScheduledHours) * 100 : 0,
+    forecastHoursVariance,
+    forecastHoursVariancePct: totalForecastHours > 0 ? (forecastHoursVariance / totalForecastHours) * 100 : 0,
     costVariance,
     costVariancePct: totalBudgetCost > 0 ? (costVariance / totalBudgetCost) * 100 : 0,
     stdVariance,
@@ -139,6 +185,8 @@ function buildSummary(ctx: AIInsightsContext): DerivedSummary {
     topUnderBudget: topUnderBudget && topUnderBudget.costVariance < 0 ? topUnderBudget : null,
     topOt,
     topStdMiss: topStdMiss && topStdMiss.stdVariance > 0 ? topStdMiss : null,
+    topScheduleGap,
+    topForecastGap,
   };
 }
 
@@ -169,6 +217,68 @@ interface Insight {
 
 function generateInsights(ctx: AIInsightsContext, s: DerivedSummary): Insight[] {
   const insights: Insight[] = [];
+  const scope = getScopeLabels(ctx);
+
+  const addScheduleCoverage = () => {
+    if (Math.abs(s.scheduledHoursVariancePct) <= 2) return;
+    const isUnderScheduled = s.scheduledHoursVariance > 0;
+    insights.push({
+      kind: isUnderScheduled ? 'risk' : 'opportunity',
+      title: isUnderScheduled
+        ? `${scope.selectedLabel} scheduled coverage trails actual hours by ${fmtHours(s.scheduledHoursVariance)}`
+        : `${scope.selectedLabel} scheduled coverage exceeds actual hours by ${fmtHours(-s.scheduledHoursVariance)}`,
+      body: s.topScheduleGap
+        ? `${s.topScheduleGap.hotel.name} has the largest schedule gap at ${fmtSignedHours(s.topScheduleGap.scheduledVariance)} vs. scheduled hours.`
+        : 'Coverage is uneven across the selected properties.',
+      actions: isUnderScheduled
+        ? [
+            'Re-align the next 7 days of schedules to forecasted demand and close the coverage gap.',
+            'Shift open shifts into the highest-pressure departments before adding overtime.',
+          ]
+        : [
+            'Trim over-scheduled shifts where occupancy does not support current coverage.',
+            'Convert excess coverage into flex hours or training time before premium hours are triggered.',
+          ],
+    });
+  };
+
+  const addForecastHoursDrift = () => {
+    if (Math.abs(s.forecastHoursVariancePct) <= 2.5) return;
+    const isOverActual = s.forecastHoursVariance > 0;
+    insights.push({
+      kind: isOverActual ? 'risk' : 'observation',
+      title: isOverActual
+        ? `${scope.selectedLabel} actual hours are ahead of forecast by ${fmtHours(s.forecastHoursVariance)}`
+        : `${scope.selectedLabel} actual hours are below forecast by ${fmtHours(-s.forecastHoursVariance)}`,
+      body: s.topForecastGap
+        ? `${s.topForecastGap.hotel.name} shows the largest forecast-hours drift at ${fmtSignedHours(s.topForecastGap.forecastVariance)}.`
+        : 'Forecast-hours drift is spread across the selected properties.',
+      actions: isOverActual
+        ? [
+            'Refresh the demand forecast and rebase the remaining schedule to avoid creating additional OT.',
+            'Check whether occupancy or service recovery demand is driving the extra hours.',
+          ]
+        : [
+            'Confirm service levels and response times are holding with the leaner-than-forecast hours.',
+            'Lock the favorable forecast delta into the next planning cycle if quality remains stable.',
+          ],
+    });
+  };
+
+  const addConcentration = () => {
+    if (ctx.selectedHotels.length <= 1 || !s.topOt || s.totalOtCost <= 0) return;
+    const share = (s.topOt.otCost / s.totalOtCost) * 100;
+    if (share < 35) return;
+    insights.push({
+      kind: 'observation',
+      title: `${s.topOt.hotel.name} accounts for ${share.toFixed(0)}% of total OT cost`,
+      body: `OT exposure is concentrated in one property, so a targeted schedule reset there will move the portfolio fastest.`,
+      actions: [
+        `Deep-dive ${s.topOt.hotel.name} to identify the top OT-producing departments and shift the next schedule away from premium hours.`,
+        'Compare the property’s actual hours to scheduled hours to isolate whether the issue is coverage, demand, or execution.',
+      ],
+    });
+  };
 
   const addCostVariance = () => {
     if (Math.abs(s.costVariancePct) <= 1.5) return;
@@ -176,8 +286,8 @@ function generateInsights(ctx: AIInsightsContext, s: DerivedSummary): Insight[] 
     insights.push({
       kind: isOver ? 'risk' : 'opportunity',
       title: isOver
-        ? `Labor cost is over budget by ${fmtCurrency(s.costVariance)} (${fmtPct(s.costVariancePct)})`
-        : `Labor cost is under budget by ${fmtCurrency(-s.costVariance)} (${fmtPct(s.costVariancePct)})`,
+        ? `${scope.selectedLabel} labor cost is over budget by ${fmtCurrency(s.costVariance)} (${fmtPct(s.costVariancePct)})`
+        : `${scope.selectedLabel} labor cost is under budget by ${fmtCurrency(-s.costVariance)} (${fmtPct(s.costVariancePct)})`,
       body:
         s.topOverBudget && isOver
           ? `${s.topOverBudget.hotel.name} drives ${fmtCurrency(s.topOverBudget.costVariance)} of the overage (${fmtPct(
@@ -208,7 +318,7 @@ function generateInsights(ctx: AIInsightsContext, s: DerivedSummary): Insight[] 
     const isOver = s.hoursVariance > 0;
     insights.push({
       kind: isOver ? 'risk' : 'opportunity',
-      title: `Actual hours are ${fmtSignedHours(s.hoursVariance)} vs. budget (${fmtPct(s.hoursVariancePct)})`,
+      title: `${scope.selectedLabel} actual hours are ${fmtSignedHours(s.hoursVariance)} vs. budget (${fmtPct(s.hoursVariancePct)})`,
       body: isOver
         ? 'Hours are running hot — look at scheduling discipline and call-in coverage.'
         : 'Hours are running lean — confirm coverage matches forecasted occupancy.',
@@ -229,7 +339,7 @@ function generateInsights(ctx: AIInsightsContext, s: DerivedSummary): Insight[] 
     if (s.otRate > 6) {
       insights.push({
         kind: 'risk',
-        title: `Overtime rate is elevated at ${s.otRate.toFixed(1)}% of actual hours`,
+        title: `${scope.selectedLabel} overtime rate is elevated at ${s.otRate.toFixed(1)}% of actual hours`,
         body: s.topOt
           ? `${s.topOt.hotel.name} carries the highest OT cost exposure at ${fmtCurrency(s.topOt.otCost)} from ${fmtHours(
               s.topOt.otHours
@@ -246,8 +356,8 @@ function generateInsights(ctx: AIInsightsContext, s: DerivedSummary): Insight[] 
     } else if (s.otRate < 3 && s.totalActualHours > 0) {
       insights.push({
         kind: 'observation',
-        title: `Overtime is well controlled at ${s.otRate.toFixed(1)}%`,
-        body: 'Premium-hour exposure is below the 3% benchmark for the selected window.',
+        title: `${scope.selectedLabel} overtime is well controlled at ${s.otRate.toFixed(1)}%`,
+        body: `Premium-hour exposure is below the 3% benchmark for ${scope.selectedLabel}.`,
       });
     }
   };
@@ -256,7 +366,7 @@ function generateInsights(ctx: AIInsightsContext, s: DerivedSummary): Insight[] 
     if (s.stdVariance > 0 && s.stdVariancePct > 2) {
       insights.push({
         kind: 'risk',
-        title: `Actual hours exceed productivity standards by ${fmtPct(s.stdVariancePct)}`,
+        title: `${scope.selectedLabel} actual hours exceed productivity standards by ${fmtPct(s.stdVariancePct)}`,
         body: s.topStdMiss
           ? `${s.topStdMiss.hotel.name} is ${fmtSignedHours(s.topStdMiss.stdVariance)} over standard — a productivity coaching candidate.`
           : 'Several properties are operating above standard hours.',
@@ -271,7 +381,7 @@ function generateInsights(ctx: AIInsightsContext, s: DerivedSummary): Insight[] 
     } else if (s.stdVariance < 0) {
       insights.push({
         kind: 'opportunity',
-        title: `Portfolio is running ${fmtSignedHours(s.stdVariance)} below standard`,
+        title: `${scope.selectedLabel} is running ${fmtSignedHours(s.stdVariance)} below standard`,
         body: 'Labor efficiency is favorable vs. the productivity baseline; confirm quality scores remain stable.',
         actions: [
           'Spot-check guest-satisfaction trends and service-recovery counts to ensure the leaner labor is not eroding experience.',
@@ -310,7 +420,7 @@ function generateInsights(ctx: AIInsightsContext, s: DerivedSummary): Insight[] 
       insights.push({
         kind: 'risk',
         title: `${atRisk} ${atRisk === 1 ? 'property is' : 'properties are'} at risk`,
-        body: `${onTrack} on track · ${caution} in caution · ${atRisk} at risk. Prioritize the at-risk properties in your daily standup.`,
+        body: `${onTrack} on track · ${caution} in caution · ${atRisk} at risk. Prioritize the at-risk ${scope.subjectNoun} in your daily standup.`,
         actions: [
           'Schedule a 30-minute war-room with each at-risk property GM within 48 hours to align on the top 3 corrective levers.',
           'Assign an Ops lead to own the recovery plan for each at-risk property and report progress weekly.',
@@ -320,7 +430,7 @@ function generateInsights(ctx: AIInsightsContext, s: DerivedSummary): Insight[] 
     } else if (caution > onTrack) {
       insights.push({
         kind: 'observation',
-        title: `Caution outweighs on-track (${caution} vs. ${onTrack})`,
+        title: `${scope.selectedLabel} caution outweighs on-track (${caution} vs. ${onTrack})`,
         body: 'Trend is drifting; address the largest variance drivers before they escalate to at-risk.',
         actions: [
           'Pull the top variance driver for each caution property and assign an owner this week.',
@@ -330,8 +440,8 @@ function generateInsights(ctx: AIInsightsContext, s: DerivedSummary): Insight[] 
     } else {
       insights.push({
         kind: 'opportunity',
-        title: `${onTrack} of ${total} properties on track`,
-        body: 'Portfolio health is strong — focus coaching effort on the caution cohort to lift them to on-track.',
+        title: `${onTrack} of ${total} ${scope.subjectNoun} on track`,
+        body: `${scope.singleProperty ? 'Property health is strong' : 'Portfolio health is strong'} — focus coaching effort on the caution cohort to lift them to on-track.`,
       });
     }
   };
@@ -340,25 +450,35 @@ function generateInsights(ctx: AIInsightsContext, s: DerivedSummary): Insight[] 
     case 'overview':
       addRiskMix();
       addCostVariance();
+      addScheduleCoverage();
+      addForecastHoursDrift();
       addOvertime();
+      addConcentration();
       break;
     case 'budget-performance':
       addCostVariance();
       addHoursVariance();
+      addScheduleCoverage();
       addForecastDrift();
+      addForecastHoursDrift();
       break;
     case 'mid-month-forecast':
       addForecastDrift();
+      addForecastHoursDrift();
       addCostVariance();
+      addScheduleCoverage();
       addOvertime();
       break;
     case 'plan-standard-performance':
       addStandards();
       addHoursVariance();
+      addScheduleCoverage();
       addCostVariance();
       break;
     case 'overtime-intelligence':
       addOvertime();
+      addScheduleCoverage();
+      addConcentration();
       if (s.topOt) {
         insights.push({
           kind: 'observation',
@@ -380,21 +500,25 @@ function generateInsights(ctx: AIInsightsContext, s: DerivedSummary): Insight[] 
         title: 'Scenario Lab is a what-if model',
         body: `Baseline labor cost is ${fmtCurrency(s.totalActualCost)} on ${fmtHours(
           s.totalActualHours
-        )}. Move the sliders to model occupancy, productivity, OT, agency, and wage changes — then ask me how the scenario compares to budget or forecast.`,
+        )}. Move the sliders to model occupancy, productivity, OT, agency, and wage changes — then ask me how the scenario compares to budget or forecast for ${scope.selectedLabel}.`,
       });
       addOvertime();
+      addScheduleCoverage();
       break;
     default:
       addCostVariance();
+      addScheduleCoverage();
+      addForecastHoursDrift();
       addOvertime();
       addStandards();
+      addConcentration();
   }
 
   if (insights.length === 0) {
     insights.push({
       kind: 'observation',
       title: 'No material exceptions detected',
-      body: `Across ${ctx.selectedHotels.length} selected ${ctx.selectedHotels.length === 1 ? 'property' : 'properties'} for ${ctx.periodLabel}, key labor metrics on the ${ctx.moduleLabel} tab are within expected ranges.`,
+      body: `Across ${ctx.selectedHotels.length} selected ${scope.subjectNoun} for ${ctx.periodLabel}, key labor metrics on the ${ctx.moduleLabel} tab are within expected ranges.`,
     });
   }
 
@@ -405,6 +529,7 @@ function generateInsights(ctx: AIInsightsContext, s: DerivedSummary): Insight[] 
 
 function answerQuestion(q: string, ctx: AIInsightsContext, s: DerivedSummary): string {
   const text = q.toLowerCase();
+  const scope = getScopeLabels(ctx);
 
   const has = (...needles: string[]) => needles.some((n) => text.includes(n));
   const wantsAction = has(
@@ -428,9 +553,7 @@ function answerQuestion(q: string, ctx: AIInsightsContext, s: DerivedSummary): s
 
   // Greetings / capabilities
   if (has('hello', 'hi ', 'hey', 'help', 'what can you')) {
-    return `I can answer questions about the data currently on your screen — ${ctx.moduleLabel} for ${ctx.periodLabel}, covering ${ctx.selectedHotels.length} selected ${
-      ctx.selectedHotels.length === 1 ? 'property' : 'properties'
-    }. Try asking about budget variance, overtime, productivity vs. standards, or how to fix a specific issue.`;
+    return `I can answer questions about the data currently on your screen — ${ctx.moduleLabel} for ${ctx.periodLabel}, covering ${ctx.selectedHotels.length} selected ${scope.subjectNoun}. Try asking about budget variance, overtime, productivity vs. standards, or how to fix a specific issue.`;
   }
 
   // Top variance / over budget
@@ -463,9 +586,7 @@ function answerQuestion(q: string, ctx: AIInsightsContext, s: DerivedSummary): s
     const lead = s.topOt
       ? ` ${s.topOt.hotel.name} leads at ${fmtCurrency(s.topOt.otCost)} (${fmtHours(s.topOt.otHours)}).`
       : '';
-    const summary = `Overtime totals ${fmtHours(s.totalOtHours)} or ${fmtCurrency(s.totalOtCost)} in premium cost — that's ${s.otRate.toFixed(
-      1
-    )}% of actual hours.${lead}`;
+    const summary = `${scope.selectedLabel} overtime totals ${fmtHours(s.totalOtHours)} or ${fmtCurrency(s.totalOtCost)} in premium cost — that's ${s.otRate.toFixed(1)}% of actual hours.${lead}`;
     if (wantsAction || s.otRate > 6) {
       return formatActions(summary, [
         s.topOt
@@ -480,7 +601,7 @@ function answerQuestion(q: string, ctx: AIInsightsContext, s: DerivedSummary): s
 
   // Productivity / standards
   if (has('standard', 'productivity', 'efficiency')) {
-    const base = `Portfolio actual vs. standard variance is ${fmtSignedHours(s.stdVariance)} (${fmtPct(
+    const base = `${scope.selectedLabel} actual vs. standard variance is ${fmtSignedHours(s.stdVariance)} (${fmtPct(
       s.stdVariancePct
     )}). ${
       s.topStdMiss
@@ -517,9 +638,32 @@ function answerQuestion(q: string, ctx: AIInsightsContext, s: DerivedSummary): s
     return lead;
   }
 
+  if (has('schedule', 'scheduled', 'coverage', 'roster')) {
+    const lead = `${scope.selectedLabel} scheduled hours are ${fmtHours(s.totalScheduledHours)} vs. actual hours of ${fmtHours(s.totalActualHours)} (${fmtSignedHours(s.scheduledHoursVariance)}, ${fmtPct(s.scheduledHoursVariancePct)}).`;
+    if (wantsAction && Math.abs(s.scheduledHoursVariancePct) > 2) {
+      return formatActions(lead, [
+        'Rework the next 7-day schedule against forecasted demand and service priorities.',
+        'Pull open shifts from the lowest-pressure areas before adding OT.',
+        'Check whether the gap is caused by absenteeism, coverage rules, or late changes.',
+      ]);
+    }
+    return lead;
+  }
+
+  if (has('forecast hours', 'forecasted hours', 'forecast staffing', 'forecast staffing hours')) {
+    const lead = `${scope.selectedLabel} forecasted hours are ${fmtHours(s.totalForecastHours)} vs. actual hours of ${fmtHours(s.totalActualHours)} (${fmtSignedHours(s.forecastHoursVariance)}, ${fmtPct(s.forecastHoursVariancePct)}).`;
+    if (wantsAction && Math.abs(s.forecastHoursVariancePct) > 2.5) {
+      return formatActions(lead, [
+        'Refresh the labor forecast inputs and re-run the staffing model.',
+        'Compare the variance against occupancy and service-recovery demand.',
+      ]);
+    }
+    return lead;
+  }
+
   // Budget / cost totals
   if (has('budget', 'cost', 'spend', 'labor cost')) {
-    const lead = `For ${ctx.periodLabel}, actual labor cost is ${fmtCurrency(
+    const lead = `For ${scope.selectedLabel} during ${ctx.periodLabel}, actual labor cost is ${fmtCurrency(
       s.totalActualCost
     )} against a budget of ${fmtCurrency(s.totalBudgetCost)} — variance of ${fmtSignedCurrency(
       s.costVariance
@@ -538,14 +682,14 @@ function answerQuestion(q: string, ctx: AIInsightsContext, s: DerivedSummary): s
 
   // Hours
   if (has('hours', 'staffing', 'headcount')) {
-    return `Actual hours: ${fmtHours(s.totalActualHours)} vs. budgeted ${fmtHours(
+    return `${scope.selectedLabel} actual hours: ${fmtHours(s.totalActualHours)} vs. budgeted ${fmtHours(
       s.totalBudgetHours
     )} (${fmtSignedHours(s.hoursVariance)}, ${fmtPct(s.hoursVariancePct)}).`;
   }
 
   // Risk
   if (has('risk', 'attention', 'at-risk', 'caution', 'on track')) {
-    const lead = `${ctx.riskCounts.onTrack} on track · ${ctx.riskCounts.caution} in caution · ${ctx.riskCounts.atRisk} at risk across the selected portfolio.`;
+    const lead = `${ctx.riskCounts.onTrack} on track · ${ctx.riskCounts.caution} in caution · ${ctx.riskCounts.atRisk} at risk across ${scope.selectedLabel}.`;
     if (wantsAction && ctx.riskCounts.atRisk > 0) {
       return formatActions(lead, [
         'Schedule a 30-minute war-room with each at-risk property GM within 48 hours.',
@@ -593,7 +737,7 @@ function answerQuestion(q: string, ctx: AIInsightsContext, s: DerivedSummary): s
     s.costVariancePct
   )}); OT rate ${s.otRate.toFixed(1)}%; standard variance ${fmtSignedHours(
     s.stdVariance
-  )}. Ask me about a specific property, overtime, forecast drift, or how to fix a specific issue.`;
+  )}. Ask me about a specific ${scope.subjectSingular}, overtime, forecast drift, or how to fix a specific issue.`;
 }
 
 // ---------- Component ----------
@@ -603,36 +747,42 @@ const SUGGESTED_PROMPTS_BY_MODULE: Record<string, string[]> = {
     'Which properties are at risk?',
     'What are the biggest variance drivers?',
     'How does overtime look right now?',
+    'Where is coverage off schedule?',
     'What corrective actions do you recommend?',
   ],
   'budget-performance': [
     'Which property is most over budget?',
     'How big is the cost variance?',
     'Where are we saving money?',
+    'How far off is scheduled coverage?',
     'How do I fix the cost overage?',
   ],
   'mid-month-forecast': [
     'Are we tracking against forecast?',
     'What is the projected month-end?',
     'Which property is drifting most from forecast?',
+    'Where is forecast-hours drift largest?',
     'What should I do to close the forecast gap?',
   ],
   'plan-standard-performance': [
     'Which property is operating above standard hours?',
     'How does actual compare to schedule?',
     'Where is unscheduled work highest?',
+    'How do scheduled hours compare to actual hours?',
     'How can we improve productivity vs. standard?',
   ],
   'overtime-intelligence': [
     'Where is overtime concentrated?',
     'What is our OT cost exposure?',
     'Which department drives the most OT?',
+    'Where is OT most concentrated by property?',
     'How do I reduce overtime?',
   ],
   'scenario-lab': [
     'How does the scenario compare to budget?',
     'What changes would reduce OT cost the most?',
     'What is the quality risk of this scenario?',
+    'How does the schedule compare to forecast?',
     'Recommend actions to improve the scenario.',
   ],
 };
@@ -641,12 +791,14 @@ const DEFAULT_SUGGESTED_PROMPTS = [
   'Which property is most over budget?',
   'How does overtime look right now?',
   'Are we tracking against forecast?',
+  'Where is coverage off schedule?',
   'Which property is operating above standard hours?',
 ];
 
 export const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ open, onClose, context }) => {
   const summary = useMemo(() => buildSummary(context), [context]);
   const insights = useMemo(() => generateInsights(context, summary), [context, summary]);
+  const scope = getScopeLabels(context);
   const suggestedPrompts =
     SUGGESTED_PROMPTS_BY_MODULE[context.activeModule] ?? DEFAULT_SUGGESTED_PROMPTS;
 
@@ -738,9 +890,7 @@ export const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ open, onClose,
             <div>
               <div className="text-sm font-semibold leading-tight">AI Insights</div>
               <div className="text-[11px] opacity-80 leading-tight">
-                Scoped to {context.moduleLabel} · {context.periodLabel} ·{' '}
-                {context.selectedHotels.length}{' '}
-                {context.selectedHotels.length === 1 ? 'property' : 'properties'}
+                Scoped to {context.moduleLabel} · {context.periodLabel} · {context.selectedHotels.length} {scope.subjectNoun}
               </div>
             </div>
           </div>
@@ -771,7 +921,7 @@ export const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({ open, onClose,
           <div className="p-4 space-y-3 bg-gradient-to-b from-teal/5 to-transparent border-b border-gray-100">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-teal-dark">
               <Lightbulb className="w-3.5 h-3.5" />
-              <span>What the AI sees on the {context.moduleLabel} tab</span>
+              <span>What the AI sees for {scope.subjectLabel}</span>
             </div>
             <ul className="space-y-2">
               {insights.map((ins, i) => {

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { TopVarianceDriver, LaborMetrics } from '../../types';
 import { Zap, ChevronDown, ChevronRight } from 'lucide-react';
+import { HotelLink } from '../ui/HotelSelectionContext';
 
 interface TopVarianceDriversProps {
   drivers: TopVarianceDriver[];
@@ -162,7 +163,7 @@ export const TopVarianceDrivers: React.FC<TopVarianceDriversProps> = ({
   }, [drivers, metrics, hotelNameById, additiveScale]);
 
   return (
-    <div className="metric-card">
+    <div>
       <div className="divide-y divide-gray-100">
         {drivers.map((driver, index) => {
           const barWidth = (driver.impact / maxImpact) * 100;
@@ -230,9 +231,9 @@ export const TopVarianceDrivers: React.FC<TopVarianceDriversProps> = ({
                         return (
                           <li key={row.hotelId} className="py-2 first:pt-0 last:pb-0">
                             <div className="flex items-center justify-between gap-3">
-                              <div className="text-sm font-medium text-slate-navy truncate">
+                              <HotelLink hotelId={row.hotelId} className="text-sm font-medium text-slate-navy truncate" stopPropagation>
                                 {row.hotelName}
-                              </div>
+                              </HotelLink>
                               <div className="text-right flex-shrink-0">
                                 <div className="text-sm font-semibold text-slate-navy tabular-nums">
                                   {fmtCurrency(row.amount)}

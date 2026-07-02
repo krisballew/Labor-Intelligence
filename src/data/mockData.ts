@@ -77,6 +77,22 @@ export const MOCK_HOTELS: Hotel[] = [
     serviceLevel: 'upscale',
     roomCount: 160,
   },
+  {
+    id: 'h9',
+    name: 'Harbor Convention Hotel',
+    region: 'West Coast',
+    brand: 'Upper Upscale',
+    serviceLevel: 'upper-upscale',
+    roomCount: 220,
+  },
+  {
+    id: 'h10',
+    name: 'Riverside Suites',
+    region: 'South',
+    brand: 'Select Service',
+    serviceLevel: 'select-service',
+    roomCount: 140,
+  },
 ];
 
 // Generate labor metrics for each hotel
@@ -426,6 +442,92 @@ const generateLaborMetrics = (hotelId: string): LaborMetrics => {
         },
       ],
     },
+    h9: {
+      // Harbor Convention Hotel - Service Quality Risk (under forecast/standard)
+      actualHours: 8400,
+      budgetedHours: 9800,
+      forecastedHours: 10800,
+      scheduledHours: 10200,
+      standardHours: 11000,
+      actualCost: 126000,
+      budgetedCost: 147000,
+      forecastedCost: 162000,
+      actualOvertimeHours: 210,
+      scheduledOvertimeHours: 260,
+      ovetimeRate: 1.5,
+      actualVariance: -14.3,
+      costVariance: -14.3,
+      riskLevel: 'caution',
+      varianceDrivers: [
+        {
+          category: 'forecast',
+          impact: 7200,
+          percentage: 42,
+          description: 'Labor supply below forecasted occupancy pace',
+        },
+        {
+          category: 'execution',
+          impact: 4600,
+          percentage: 27,
+          description: 'Under-covered peak windows at arrivals and events',
+        },
+        {
+          category: 'demand',
+          impact: 3400,
+          percentage: 20,
+          description: 'Convention-driven volume above staffing assumptions',
+        },
+        {
+          category: 'productivity',
+          impact: 1900,
+          percentage: 11,
+          description: 'Service compression is masking true labor need',
+        },
+      ],
+    },
+    h10: {
+      // Riverside Suites - Service Quality Risk (under forecast/standard)
+      actualHours: 5100,
+      budgetedHours: 6200,
+      forecastedHours: 6900,
+      scheduledHours: 6500,
+      standardHours: 7200,
+      actualCost: 76500,
+      budgetedCost: 93000,
+      forecastedCost: 103500,
+      actualOvertimeHours: 120,
+      scheduledOvertimeHours: 180,
+      ovetimeRate: 1.5,
+      actualVariance: -17.7,
+      costVariance: -17.7,
+      riskLevel: 'caution',
+      varianceDrivers: [
+        {
+          category: 'execution',
+          impact: 5400,
+          percentage: 39,
+          description: 'Shift coverage below service minimums',
+        },
+        {
+          category: 'forecast',
+          impact: 3900,
+          percentage: 28,
+          description: 'Forecast demand not fully staffed',
+        },
+        {
+          category: 'demand',
+          impact: 2700,
+          percentage: 20,
+          description: 'Transient demand lifted above baseline assumptions',
+        },
+        {
+          category: 'scheduling',
+          impact: 1800,
+          percentage: 13,
+          description: 'Schedule cutbacks increased service-pressure risk',
+        },
+      ],
+    },
   };
 
   const metrics = metricsMap[hotelId] || metricsMap['h1'];
@@ -442,9 +544,9 @@ export const MOCK_LABOR_METRICS: LaborMetrics[] = MOCK_HOTELS.map((hotel) =>
 
 // Portfolio-level metrics
 export const MOCK_PORTFOLIO_METRICS: PortfolioMetrics = {
-  totalHotels: 8,
+  totalHotels: 10,
   hotelsOnTrack: 3,
-  hotelsInCaution: 3,
+  hotelsInCaution: 5,
   hotelsAtRisk: 2,
   totalLaborVariance: 31200, // dollars
   totalLaborVariancePercent: 3.8,
@@ -563,6 +665,8 @@ export const MOCK_RISK_DISTRIBUTION: RiskDistributionPoint[] = [
   { hotelId: 'h6', hotelName: 'Beach Paradise', likelihood: 25, impact: 20, riskLevel: 'on-track' },
   { hotelId: 'h7', hotelName: 'Mountain Lodge', likelihood: 30, impact: 25, riskLevel: 'on-track' },
   { hotelId: 'h8', hotelName: 'Downtown Plaza', likelihood: 28, impact: 22, riskLevel: 'on-track' },
+  { hotelId: 'h9', hotelName: 'Harbor Convention Hotel', likelihood: 68, impact: 76, riskLevel: 'caution' },
+  { hotelId: 'h10', hotelName: 'Riverside Suites', likelihood: 64, impact: 72, riskLevel: 'caution' },
 ];
 
 // Top variance drivers across portfolio

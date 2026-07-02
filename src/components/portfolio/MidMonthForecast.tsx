@@ -13,6 +13,9 @@ import {
 } from 'lucide-react';
 import { LaborMetrics } from '../../types';
 import { MetricCard } from '../ui/Card';
+import { HotelLink } from '../ui/HotelSelectionContext';
+import ExportButton from '../ui/ExportButton';
+import CollapseToggle from '../ui/CollapseToggle';
 
 interface MidMonthForecastProps {
   metrics: LaborMetrics[];
@@ -253,6 +256,8 @@ export const MidMonthForecast: React.FC<MidMonthForecastProps> = ({ metrics, hot
   const varianceIsUnfavorable = data.projectedVariance < 0;
   const varianceColorClass = varianceIsUnfavorable ? 'text-orange' : 'text-emerald-600';
 
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -263,14 +268,24 @@ export const MidMonthForecast: React.FC<MidMonthForecastProps> = ({ metrics, hot
             Projecting where {monthName} {year} will land based on month-to-date performance.
           </p>
         </div>
-        <div className="inline-flex items-center gap-2 self-start sm:self-auto rounded-full bg-teal-dark/5 text-teal-dark px-3 py-1.5 text-xs font-medium">
-          <CalendarClock className="w-3.5 h-3.5" />
-          <span>{monthRangeLabel}</span>
-          <span className="text-teal-dark/40">•</span>
-          <span>Day {dayOfMonth} of {daysInMonth}</span>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <div className="inline-flex items-center gap-2 rounded-full bg-teal-dark/5 text-teal-dark px-3 py-1.5 text-xs font-medium">
+            <CalendarClock className="w-3.5 h-3.5" />
+            <span>{monthRangeLabel}</span>
+            <span className="text-teal-dark/40">•</span>
+            <span>Day {dayOfMonth} of {daysInMonth}</span>
+        </div>
+          <ExportButton sectionLabel="Mid-Month Forecast" />
+          <CollapseToggle
+            collapsed={collapsed}
+            onToggle={() => setCollapsed((v) => !v)}
+            sectionLabel="Mid-Month Forecast"
+          />
         </div>
       </div>
 
+      {!collapsed && (
+        <>
       {/* KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <KpiHoverCard
@@ -460,6 +475,8 @@ export const MidMonthForecast: React.FC<MidMonthForecastProps> = ({ metrics, hot
           remainingEfficiency={REMAINING_EFFICIENCY}
         />
       </div>
+        </>
+      )}
     </div>
   );
 };
@@ -924,17 +941,22 @@ const DailyBreakdownTable: React.FC<DailyBreakdownTableProps> = ({
                   {/* Property row */}
                   <tr className="border-b border-gray-200 hover:bg-gray-50/60">
                     <td className="bg-white px-3 py-2 border-r border-gray-200">
-                      <button
-                        onClick={() => toggleProp(p.hotelId)}
-                        className="flex items-center gap-1.5 text-left w-full font-semibold text-slate-navy"
-                      >
-                        {propOpen ? (
-                          <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                        ) : (
-                          <ChevronRight className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                        )}
-                        <span className="truncate">{p.hotelName}</span>
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => toggleProp(p.hotelId)}
+                          className="text-gray-400 hover:text-slate-navy flex-shrink-0"
+                          aria-label={propOpen ? `Collapse ${p.hotelName}` : `Expand ${p.hotelName}`}
+                        >
+                          {propOpen ? (
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          ) : (
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                        <HotelLink hotelId={p.hotelId} className="truncate font-semibold text-slate-navy">
+                          {p.hotelName}
+                        </HotelLink>
+                      </div>
                     </td>
                     {visibleDays.map((d) =>
                       renderPair(p.daily[d - 1], p.dailyBudget[d - 1], d, d === today, 'px-2 py-2')

@@ -37,7 +37,7 @@ export interface LaborMetrics {
 }
 
 export interface VarianceDriver {
-  category: 'demand' | 'productivity' | 'scheduling' | 'overtime' | 'wage-rate' | 'forecast' | 'execution';
+  category: 'demand' | 'productivity' | 'scheduling' | 'overtime' | 'wage-rate' | 'forecast' | 'execution' | 'service-quality';
   impact: number; // Dollar amount
   percentage: number;
   description: string;
@@ -119,4 +119,40 @@ export interface QuickStatRow {
 export interface LaborQuickStatsSection {
   section: 'Rooms' | 'Food & Beverage' | 'Outlets' | 'Banquets' | 'Kitchen & Stewarding';
   rows: QuickStatRow[];
+}
+
+// Property-focused (single-hotel) org hierarchy & metrics
+export type OrgEntityType = 'division' | 'department' | 'job';
+
+export interface EntityLaborMetrics {
+  hotelId: string;
+  entityId: string;
+  entityName: string;
+  entityType: OrgEntityType;
+  divisionName: string;
+  departmentName?: string; // present for department + job rows
+  parentId?: string; // department.parentId = division.id; job.parentId = department.id
+  actualHours: number;
+  budgetedHours: number;
+  forecastedHours: number;
+  scheduledHours: number;
+  standardHours: number;
+  actualCost: number;
+  budgetedCost: number;
+  forecastedCost: number;
+  actualOvertimeHours: number;
+  scheduledOvertimeHours: number;
+  costVariancePercent: number;
+  riskLevel: RiskLevel;
+  topDriver: {
+    category: 'overtime' | 'productivity' | 'demand' | 'execution' | 'wage-rate' | 'forecast' | 'scheduling';
+    percentage: number;
+    description: string;
+  };
+}
+
+export interface PropertyOrgBreakdown {
+  divisions: EntityLaborMetrics[];
+  departments: EntityLaborMetrics[];
+  jobs: EntityLaborMetrics[];
 }

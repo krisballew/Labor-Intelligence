@@ -1,5 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Hotel, LaborQuickStatsSection, QuickStatRow } from '../../types';
+import ExportButton from '../ui/ExportButton';
+import CollapseToggle from '../ui/CollapseToggle';
 
 export type QuickStatsPeriod = 'previous-month' | 'current-month' | 'ytd';
 
@@ -8,6 +10,9 @@ interface LaborQuickStatsProps {
   statsByHotel: Record<string, LaborQuickStatsSection[]>;
   period?: QuickStatsPeriod;
   selectedIds: string[];
+  title?: string;
+  subtitle?: string;
+  emptyMessage?: string;
 }
 
 const MONTH_NAMES = [
@@ -135,6 +140,9 @@ export const LaborQuickStats: React.FC<LaborQuickStatsProps> = ({
   statsByHotel,
   period = 'previous-month',
   selectedIds,
+  title = 'Labor Performance Quick Stats',
+  subtitle,
+  emptyMessage = 'Select one or more properties to view labor performance.',
 }) => {
   const { forecastLabel: label, additiveScale } = useMemo(
     () => getPeriodView(period),
@@ -153,62 +161,77 @@ export const LaborQuickStats: React.FC<LaborQuickStatsProps> = ({
     }));
   }, [statsByHotel, hotels, selectedIds, additiveScale]);
 
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-semibold text-slate-navy">
-            Labor Performance Quick Stats
+            {title}
           </h2>
+          {subtitle && (
+            <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <ExportButton sectionLabel={title} />
+          <CollapseToggle
+            collapsed={collapsed}
+            onToggle={() => setCollapsed((v) => !v)}
+            sectionLabel={title}
+          />
         </div>
       </div>
 
-      {sections.length === 0 ? (
-        <div className="metric-card text-center text-gray-500 text-sm py-12">
-          Select one or more properties to view labor performance.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sections.map((section) => (
-            <div key={section.section} className="metric-card p-0 overflow-hidden">
-              <div
-                className={`${SECTION_COLORS[section.section]} text-white text-center py-2 font-semibold text-sm`}
-              >
-                {section.section}
-              </div>
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="bg-gray-50 text-gray-500 uppercase tracking-wider">
-                    <th className="text-left px-3 py-2 font-medium w-1/3">Metric</th>
-                    <th className="text-right px-2 py-2 font-medium">{label}</th>
-                    <th className="text-right px-2 py-2 font-medium">Act</th>
-                    <th className="text-right px-2 py-2 font-medium">+/-</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {section.rows.map((row) => (
-                    <tr key={row.label} className="border-t border-gray-100">
-                      <td className="px-3 py-2 font-medium text-gray-700">{row.label}</td>
-                      <td className="px-2 py-2 text-right text-gray-600 tabular-nums">
-                        {formatValue(row, row.forecast)}
-                      </td>
-                      <td className="px-2 py-2 text-right text-gray-900 font-medium tabular-nums">
-                        {formatValue(row, row.actual)}
-                      </td>
-                      <td className="px-2 py-2 text-right">
-                        <span
-                          className={`inline-block rounded px-2 py-0.5 font-medium tabular-nums ${varianceColor(row)}`}
-                        >
-                          {row.variancePercent.toFixed(1)}%
-                        </span>
-                      </td>
+      {!collapsed && (
+        sections.length === 0 ? (
+          <div className="metric-card text-center text-gray-500 text-sm py-12">
+            {emptyMessage}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {sections.map((section) => (
+              <div key={section.section} className="metric-card p-0 overflow-hidden">
+                <div
+                  className={`${SECTION_COLORS[section.section]} text-white text-center py-2 font-semibold text-sm`}
+                >
+                  {section.section}
+                </div>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 text-gray-500 uppercase tracking-wider">
+                      <th className="text-left px-3 py-2 font-medium w-1/3">Metric</th>
+                      <th className="text-right px-2 py-2 font-medium">{label}</th>
+                      <th className="text-right px-2 py-2 font-medium">Act</th>
+                      <th className="text-right px-2 py-2 font-medium">+/-</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ))}
-        </div>
+                  </thead>
+                  <tbody>
+                    {section.rows.map((row) => (
+                      <tr key={row.label} className="border-t border-gray-100">
+                        <td className="px-3 py-2 font-medium text-gray-700">{row.label}</td>
+                        <td className="px-2 py-2 text-right text-gray-600 tabular-nums">
+                          {formatValue(row, row.forecast)}
+                        </td>
+                        <td className="px-2 py-2 text-right text-gray-900 font-medium tabular-nums">
+                          {formatValue(row, row.actual)}
+                        </td>
+                        <td className="px-2 py-2 text-right">
+                          <span
+                            className={`inline-block rounded px-2 py-0.5 font-medium tabular-nums ${varianceColor(row)}`}
+                          >
+                            {row.variancePercent.toFixed(1)}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+        )
       )}
     </div>
   );
